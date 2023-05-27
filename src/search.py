@@ -1,39 +1,8 @@
 import http.client
 from bs4 import BeautifulSoup
+from util.util import Color, Cursor
 
 URL = "html.duckduckgo.com"
-
-
-class Color:
-    def __init__(self, color):
-        if color == 0:
-            self.r = 0
-            self.g = 0
-            self.b = 0
-            return
-        if color.startswith("#"):
-            self.parse_hex(color)
-        else:
-            self.parse_rgb(color)
-
-    def rst(self):
-        return "\x1b[0m"
-
-    def parse_hex(self, color):
-        self.r = int(color[1:3], 16)
-        self.g = int(color[3:5], 16)
-        self.b = int(color[5:7], 16)
-
-    def parse_rgb(self, color):
-        self.r, self.g, self.b = color.split(",")
-
-    def foreground(self, underline=False):
-        if underline:
-            return f"\x1b[38;2;{self.r};{self.g};{self.b};4;1m"
-        return f"\x1b[38;2;{self.r};{self.g};{self.b};1m"
-
-    def background(self):
-        return f"\x1b[48;2;{self.r};{self.g};{self.b}m"
 
 
 class Result:
@@ -42,10 +11,9 @@ class Result:
     description_color = Color("#e3e9c3").foreground()
 
     def __init__(self, title, url, description):
-        self.title = title
-        self.url = url
-        self.description = description
-        self.clean_desc()
+        self.title = f"{self.title_color}{title}{Color(0).rst()}"
+        self.url = f"{self.url_color}{url}{Color(0).rst()}"
+        self.description = f"{self.description_color}{description}{Color(0).rst()}"
 
     def clean_desc(self):
         max_len = 100
@@ -62,6 +30,7 @@ class Result:
         return f"<Result title={self.title} url={self.url} description={self.description}>"
 
     def pretty(self):
+        self.clean_desc()
         return f"""
     {self.title_color}{self.title}{Color(0).rst()}
     {self.url_color}{self.url}{Color(0).rst()}
@@ -122,27 +91,49 @@ class Search:
         self.session = Session()
         self._query_dic["q"] = query
         self.session.headers.update(self._headers)
+        self.fetched_results = []
+        with open("querires_are.txt", "a") as fl:
+            fl.write(f"{query}\n")
 
     def page(self):
-        self.results = [
-            Result(
-                title=i.find("a", {"class": "result__a"}).text,
-                url=i.find("a", {"class": "result__a"}).get("href"),
-                description=i.find("a", {"class": "result__snippet"}).text,
+        try:
+            self.results = [
+                Result(
+                    title=i.find("a", {"class": "result__a"}).text,
+                    url=i.find("a", {"class": "result__a"}).get("href"),
+                    description=i.find("a", {"class": "result__snippet"}).text,
+                )
+                for i in self.fetched_results
+            ]
+        except Exception as e:
+            with open("the_dummy.txt", "a") as fl:
+                fl.write(f"{' '.join(self.fetched_results)}\n")
+            pass
+            exit()
+        if not self.results:
+            return Page(
+                [
+                    Result(
+                        title="End OF Result", url=":xxxxxxxx:", description="DuckDuckGo Html Has this much result only"
+                    )
+                ]
             )
-            for i in self.fetched_results
-        ]
         return Page(self.results)
 
     def fetch(self):
         response = self.session.post(URL, json=self._query_dic)
-        self.fetched_results = BeautifulSoup(response.text, "html.parser").find_all("div", {"class": "result"})
-        form = BeautifulSoup(response.text, "html.parser").find("div", {"class": "results"}).find("form")
-        form_input_dic = {}
-        for i in form.find_all("input", {"type": "hidden"}):
-            form_input_dic[i.get("name")] = i.get("value")
-        self._query_dic.update(form_input_dic)
-        self.page()
+        soup = BeautifulSoup(response.text, "html.parser")
+        if soup:
+            self.fetched_results = soup.find_all("div", {"class": "result"})
+            if self.fetched_results:
+                form = soup.find("div", {"class": "results"}).find("form")
+                form_input_dic = {}
+                if form:
+                    for i in form.find_all("input", {"type": "hidden"}):
+                        form_input_dic[i.get("name")] = i.get("value")
+                    self._query_dic.update(form_input_dic)
+            else:
+                self.fetched_results = []
 
     def next(self):
         self.fetch()
@@ -150,13 +141,8 @@ class Search:
 
 class Page:
     page_no = 0
-
-    def __init__(self, results):
-        self.results = results
-        self.page_no += 1
-
-    def banner(self):
-        return rf"""{Color("#49c1e7").foreground()}
+    BANNERS = [
+        rf"""{Color("#49c1e7").foreground()}
 $$$$$$$$\                                $$\                     $$\        $$$$$$\                                          $$\       
 \__$$  __|                               \__|                    $$ |      $$  __$$\                                         $$ |      
    $$ | $$$$$$\   $$$$$$\  $$$$$$\$$$$\  $$\ $$$$$$$\   $$$$$$\  $$ |      $$ /  \__| $$$$$$\   $$$$$$\   $$$$$$\   $$$$$$$\ $$$$$$$\  
@@ -168,19 +154,55 @@ $$$$$$$$\                                $$\                     $$\        $$$$
    {Color(0).rst()}
                                                                                     {Color("#f1760b").foreground()}- by @leyuskc{Color(0).rst()}
                                                                                     {Color("#f33a06").foreground()}Powred by DuckDuckGo{Color(0).rst()}
-                                                                                                                                       
-Page: {Color("#1ce5c1").foreground()}{self.page_no}{Color(0).rst()}
-"""
+""",
+        rf"""{Color("#49c1e7").foreground()}
+,--,--'                      .    .---.                 .   
+`- | ,-. ,-. ,-,-. . ,-. ,-. |    \___  ,-. ,-. ,-. ,-. |-. 
+ , | |-' |   | | | | | | ,-| |        \ |-' ,-| |   |   | | 
+ `-' `-' '   ' ' ' ' ' ' `-^ `'   `---' `-' `-^ '   `-' ' ' 
+  {Color(0).rst()}  
+                        {Color("#f1760b").foreground()}- by @leyuskc{Color(0).rst()}
+                        {Color("#f33a06").foreground()}Powred by DuckDuckGo{Color(0).rst()}
+""",
+        rf"""{Color("#49c1e7").foreground()}
+  _____              _           _   ___                  _    
+ |_   _|__ _ _ _ __ (_)_ _  __ _| | / __| ___ __ _ _ _ __| |_  
+   | |/ -_) '_| '  \| | ' \/ _` | | \__ \/ -_) _` | '_/ _| ' \ 
+   |_|\___|_| |_|_|_|_|_||_\__,_|_| |___/\___\__,_|_| \__|_||_|
+{Color(0).rst()}
+            {Color("#f1760b").foreground()}- by @leyuskc{Color(0).rst()}
+            {Color("#f33a06").foreground()}Powred by DuckDuckGo{Color(0).rst()}
+""",
+    ]
 
-    def display(self):
-        self.page = self.banner()
-        for i in self.results:
-            self.page += i.pretty()
-        return self.page
+    def __init__(self, results):
+        self.results = results
+        Page.page_no += 1
+
+    @property
+    def content(self):
+        return [i.pretty() for i in self.results]
+
+    @property
+    def banner(self):
+        return self.gbanner() + f"""Page: {Color("#1ce5c1").foreground()}{self.page_no}{Color(0).rst()}"""
+
+    def gbanner(self):
+        c = Cursor.termsize()[0]
+        if c >= 150:
+            c = 0
+        elif c >= 100 and c <= 150:
+            c = 1
+        else:
+            c = 2
+
+        return self.BANNERS[c]
 
 
-s = Search("hello")
-s.fetch()
-print(s.page().display())
-# s.next()
-# print(s.page().display())
+if __name__ == "__main__":
+    s = Search("hello")
+    s.fetch()
+    pg = s.page()
+    print(pg.banner)
+    for i in pg.content[:5]:
+        print(i)
