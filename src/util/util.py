@@ -1,7 +1,9 @@
 import os
+import re
 import sys
 import time
 import shutil
+from util import search
 import asyncio
 
 
@@ -242,7 +244,7 @@ class InputBox:
                     self.value += "\n"
             for n, i in enumerate(self.value.split("\n")):
                 print(Cursor.move(self.cursor_x + 2, self.cursor_y + 3 + n), end="")
-                print(" " * (len(i)), end="")
+                print(" " * (len(i) + 1), end="")
                 print(Cursor.move(self.cursor_x + 2, self.cursor_y + 3 + n), end="")
                 print(i)
             key = await Event.wait_key()
@@ -252,10 +254,122 @@ class InputBox:
         Cursor.clear()
 
 
+class OutputBox:
+    def __init__(self, title, x, y, width, height, color, background):
+        self.title = title
+        self.cursor_x = x
+        self.cursor_y = y
+        self.color = color if color else "186,186,186"
+        self.background = background if background else "48,48,38"
+        self.width = width
+        self.height = height
+
+    async def write_to_file(self, buffer):
+        i = InputBox("Enter_Fiel_name: ", 10, 10, 50, 10, "186,186,186", "48,48,38")
+        file_name = await i.focus()
+        with open(file_name, "w") as fl:
+            fl.write(str(buffer))
+        i.close()
+
+    async def render(self, content):
+        self.value = ""
+
+        def _mini_update():
+            Cursor.clear()
+            s = Shape().rectangle(
+                self.cursor_x,
+                self.cursor_y,
+                self.cursor_x + self.width,
+                self.cursor_y + self.height,
+                self.background,
+                True,
+            )
+            s = Shape().rectangle(
+                self.cursor_x + 1,
+                self.cursor_y + 2,
+                self.cursor_x - 3 + self.width,
+                self.cursor_y - 1 + self.height,
+                "123,213,013",
+            )
+            print(Cursor.move((self.width // 2), self.cursor_y + 1), end="")
+            print(Color(self.color).foreground(), end="")
+            print(self.title, end="")
+            print(Cursor.move(self.cursor_x + 2, self.cursor_y + 3), end="")
+            print(Cursor.visible(True), end="")
+
+        _mini_update()
+        buffer = content.replace("\n", "")
+        QUEUE = []
+        counter = 0
+        while True:
+            if QUEUE:
+                if QUEUE[0] == "q":
+                    exit(0)
+                elif QUEUE[0] == "b":
+                    break
+                elif QUEUE[0] == "s":
+                    if counter <= len(content) // self.width:
+                        counter += 1
+                    else:
+                        counter = len(content) // self.width
+                        counter += 1
+                elif QUEUE[0] == "w":
+                    if counter > 0:
+                        counter -= 1
+                    else:
+                        counter = 0
+                elif QUEUE[0] == "\\":
+                    i = InputBox(
+                        "Search Words: ",
+                        Cursor.termsize()[0] // 2 - 25,
+                        Cursor.termsize()[1] // 2 - 5,
+                        50,
+                        10,
+                        "186,186,186",
+                        "48,48,38",
+                    )
+                    value = str(await i.focus())
+                    if value == i.CANCLED_VALUE or len(value) < 2:
+                        _mini_update()
+                        QUEUE.pop(0)
+                        continue
+                    i.close()
+                    alls = list(set(re.findall(value, buffer, flags=re.IGNORECASE)))
+                    buffer = content.replace("\n", "")
+                    for i in alls:
+                        buffer = buffer.replace(i, f"\x1b[32;1;4m{i}\x1b[0m")
+                    value = None
+                    counter = 0
+
+                elif QUEUE[0] in ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"]:
+                    links = re.findall(r"(https?://[^\s]+)", buffer)
+                    if len(links) >= int(QUEUE[0]):
+                        print("Opening...", links[int(QUEUE[0]) - 1])
+                        os.system("xdg-open {}".format(links[int(QUEUE[0]) - 1]))
+                        _mini_update()
+                        continue
+                QUEUE.pop(0)
+
+            selected = str(buffer[counter * (self.width - 5) :])
+            for n in range(0, self.height - 5):
+                print(Cursor.move(self.cursor_x + 2, self.cursor_y + 3 + n), end="")
+                print(selected[n * (self.width - 5) : (n + 1) * (self.width - 5)])
+            QUEUE.append(await Event.wait_key())
+            _mini_update()
+
+    def close(self):
+        Cursor.clear()
+
+
 async def main():
-    i = InputBox("Enter your name: ", 10, 10, 50, 10, "186,186,186", "48,48,38")
-    print("\n")
-    print(await i.focus())
+    # i = InputBox("Enter your name: ", 10, 10, 50, 10, "186,186,186", "48,48,38")
+    # print("\n")
+    # print(await i.focus())
+    o = OutputBox("Webpage Title", 2, 2, *Cursor.termsize(), "186,186,186", "48,48,38")
+
+    # print(await o.render("dawdawdwad" * 100))
+
+    print(await o.render("https://facebookc.com"))
 
 
 if __name__ == "__main__":
