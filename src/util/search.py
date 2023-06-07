@@ -107,16 +107,16 @@ class Search:
         self.fetched_results = []
 
     def page(self):
+        if not self.fetched_results:
+            return Page([Result(title="End OF Result", url=":xxxxxxxx:", description=":[3]")])
         self.results = [
             Result(
-                title=i.find("a", {"class": "result__a"}).text,
-                url=i.find("a", {"class": "result__a"}).get("href"),
-                description=i.find("a", {"class": "result__snippet"}).text,
+                title=getattr(i.find("a", {"class": "result__a"}), "text", "None"),
+                url=i.find("a", {"class": "result__a"}).get("href") if i.find("a", {"class": "result__a"}) else "None",
+                description=getattr(i.find("a", {"class": "result__snippet"}), "text", "None"),
             )
             for i in self.fetched_results
         ]
-        if not self.results:
-            return Page([Result(title="End OF Result", url=":xxxxxxxx:", description=":[3]")])
         return Page(self.results)
 
     def fetch(self):
@@ -125,10 +125,15 @@ class Search:
         if soup:
             self.fetched_results = soup.find_all("div", {"class": "result"})
             if self.fetched_results:
-                form = soup.find("div", {"class": "results"}).find("form")
+                form = soup.find("div", {"class": "results"})
+                if form:
+                    form = form.find("form")
+                else:
+                    self.fetched_results = []
+                    return
                 form_input_dic = {}
                 if form:
-                    for i in form.find_all("input", {"type": "hidden"}):
+                    for i in form.find_all("input", {"type": "hidden"}):  # type:ignore
                         form_input_dic[i.get("name")] = i.get("value")
                     self.query_dic.update(form_input_dic)
             else:

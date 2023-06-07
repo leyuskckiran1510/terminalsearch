@@ -1,9 +1,7 @@
 import os
 import re
 import sys
-import time
 import shutil
-from util import search
 import asyncio
 
 
@@ -239,7 +237,7 @@ class InputBox:
                 if len(self.value) > 0:
                     self.value = self.value[:-1]
             else:
-                self.value += key
+                self.value += str(key)
                 if not ((len(self.value) + 1) % (self.width - 2)):
                     self.value += "\n"
             for n, i in enumerate(self.value.split("\n")):
@@ -304,7 +302,7 @@ class OutputBox:
         while True:
             if QUEUE:
                 if QUEUE[0] == "q":
-                    exit(0)
+                    return
                 elif QUEUE[0] == "b":
                     break
                 elif QUEUE[0] == "s":

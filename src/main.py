@@ -1,12 +1,8 @@
-import os
 import re
-import sys
-import time
-import shutil
 import asyncio
 from util import search
-from bs4 import BeautifulSoup
-from util.util import Color, Cursor, Shape, Event, InputBox, OutputBox
+from bs4 import BeautifulSoup  # type:ignore
+from util.util import Cursor, Shape, Event, InputBox, OutputBox
 
 
 QUEUE = []
@@ -55,7 +51,8 @@ async def screen(search_in_func):
         title(to_show.banner)
         if QUEUE:
             if QUEUE[0] == "q":
-                break
+                update()
+                return
             elif QUEUE[0] == "s":
                 if counter != len(to_show.results):
                     counter += 1
@@ -74,6 +71,9 @@ async def screen(search_in_func):
                     counter = len(to_show.results)
                     if PG_NUM > 0:
                         PG_NUM -= 1
+                update()
+                QUEUE.pop(0)
+                continue
             elif QUEUE[0] == "n":
                 PG_NUM += 1
                 if PG_NUM >= len(PAGES):
@@ -107,6 +107,10 @@ async def screen(search_in_func):
                 PAGES = [search_in_func.page()]
                 PG_NUM = 0
                 counter = 0
+                SCAN_ROW = 1
+                QUEUE.pop(0)
+                update()
+                continue
             elif QUEUE[0] in CLICK_ABELS:
                 visibels = to_show.results[counter : counter + MAX_RESULTS]
                 if len(visibels) >= int(QUEUE[0]):
@@ -132,7 +136,7 @@ async def screen(search_in_func):
         for n, i in enumerate(to_show.results[counter : counter + MAX_RESULTS]):
             SCAN_ROW += 1
             print(Cursor.move(3, SCAN_ROW), end="")
-            print(i.title.strip())
+            print(f"{n}) ", i.title.strip())
             SCAN_ROW += 1
             print(Cursor.move(3, SCAN_ROW), end="")
             print(i.url.strip())
@@ -141,7 +145,7 @@ async def screen(search_in_func):
             print(i.description.strip())
             SCAN_ROW += 3
         print("\033[{};1H:".format(Cursor.termsize()[0]), end="")
-        QUEUE.append(await Event.wait_key())
+        QUEUE.append(await Event.wait_key())  # type:ignore
         update()
 
 
@@ -150,3 +154,4 @@ asyncio.run(screen(page))
 Cursor.visible(True)
 Cursor.termreset()
 Cursor.clear()
+Cursor.clear_screen()
